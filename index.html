@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Flappy Clone - Deluxe Custom</title>
+  <style>
+    :root {
+      --bg: #70c5ce;
+      --ground: #dea35a;
+      --pipe: #2ea84a;
+      --bird: #ffdd57;
+      --text: #ffffff;
+      --font-main: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --ui-bg: rgba(0, 0, 0, 0.6);
+      --accent: #e86101;
+    }
+    
+    html, body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: var(--font-main);
+      background: #333;
+    }
+
+    .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      background: linear-gradient(#9be3e8, #70c5ce);
+      user-select: none; 
+      -webkit-user-select: none;
+      position: relative;
+    }
+
+    canvas {
+      background: linear-gradient(#9be3e8, rgba(255,255,255,0.05));
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 400/600;
+      touch-action: none;
+    }
+
+    /* --- UI Overlay --- */
+    .ui {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--text);
+      text-align: center;
+      pointer-events: none;
+      z-index: 10;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      width: 100%;
+    }
+
+    .ui .score { font-size: 42px; font-weight: 800; letter-spacing: 2px; }
+    .ui .hint { font-size: 14px; opacity: 0.9; margin-top: 5px; font-weight: 500; }
+
+    /* --- Customize Button --- */
+    .customize-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: var(--ui-bg);
+      color: white;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      cursor: pointer;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .customize-btn:hover {
+      transform: scale(1.1);
+      background: var(--accent);
+    }
+    
+    /* --- Customizer Modal --- */
+    .modal-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      display: none; /* Hidden by default */
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal-content {
+      background: #fff;
+      padding: 25px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 350px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      color: #333;
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+    .modal-header h2 { margin: 0; font-size: 20px; color: var(--accent); }
+    .close-btn { cursor: pointer; font-size: 24px; color: #999; }
+    .close-btn:hover { color: #333; }
+
+    .input-group { margin-bottom: 15px; }
+    .input-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    /* Custom File Input Styling */
+    .file-label {
+      display: block;
+      padding: 10px;
+      background: #f0f0f0;
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+      color: #555;
+    }
+    .file-label:hover { border-color: var(--accent); background: #fff8f0; }
+    .file-label.has-file { border-style: solid; border-color: #2ea84a; color: #2ea84a; background: #eaffea; }
+    .file-input { display: none; }
+
+    .reset-btn {
+      width: 100%;
+      padding: 10px;
+      background: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .reset-btn:hover { background: #cc0000; }
+
+    .footer {
+      position: absolute;
+      bottom: 15px;
+      width: 100%;
+      text-align: center;
+      color: #fff;
+      opacity: 0.6;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <canvas id="game" width="400" height="600"></canvas>
+    
+    <div class="ui" id="ui">
+      <div class="score" id="scoreText">0</div>
+      <div class="hint" id="hint">Tap, Click, or Space to Flap</div>
+    </div>
+
+    <button class="customize-btn" id="customizeBtn" title="Customize Game">🎨</button>
+
+    <div class="footer">by Keshav Jha💓️</div>
+  </div>
+
+  <!-- Customization Modal -->
+  <div class="modal-overlay" id="customModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Game Skins</h2>
+        <div class="close-btn" id="closeModal">&times;</div>
+      </div>
+      
+      <div class="input-group">
+        <label>Bird (PNG)</label>
+        <label class="file-label" id="lbl-bird">
+          Click to upload Bird
+          <input type="file" class="file-input" accept="image/*" data-type="bird">
+        </label>
+      </div>
+
+      <div class="input-group">
+        <label>Pipe Body (PNG)</label>
+        <label class="file-label" id="lbl-pipe">
+          Click to upload Pipe
+          <input type="file" class="file-input" accept="image/*" data-type="pipe">
+        </label>
+      </div>
+
+      <div class="input-group">
+        <label>Background (PNG)</label>
+        <label class="file-label" id="lbl-bg">
+          Click to upload Background
+          <input type="file" class="file-input" accept="image/*" data-type="bg">
+        </label>
+      </div>
+
+      <div class="input-group">
+        <label>Ground (PNG)</label>
+        <label class="file-label" id="lbl-ground">
+          Click to upload Ground
+          <input type="file" class="file-input" accept="image/*" data-type="ground">
+        </label>
+      </div>
+
+      <button class="reset-btn" id="resetAssets">Reset All Skins</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const W = canvas.width, H = canvas.height;
+
+  // --- CONSTANTS ---
+  const GRAVITY = 0.45;
+  const FLAP_STRENGTH = -8.0;
+  const PIPE_WIDTH = 60;
+  const PIPE_GAP = 160; 
+  const PIPE_INTERVAL = 1600;
+  const GROUND_HEIGHT = 80;
+  const SCROLL_SPEED = 160; // px per second
+
+  // --- GAME OBJECTS ---
+  const bird = {
+    x: 80,
+    y: H/2,
+    r: 16,
+    vy: 0,
+    rotation: 0,
+    floatOffset: 0 
+  };
+
+  // --- ASSET MANAGER ---
+  // Stores Image objects. If null, we draw default shapes.
+  const assets = {
+    bird: null,
+    pipe: null,
+    bg: null,
+    ground: null
+  };
+
+  let clouds = [];
+  let particles = [];
+  let pipes = [];
+  let lastPipeTime = 0;
+  let score = 0;
+  let best = Number(localStorage.getItem('flappy_best') || 0);
+  let state = 'ready'; 
+  let groundOffset = 0;
+  let shake = 0; 
+  let groundPattern = null; // Canvas pattern for ground texture
+
+  // UI Elements
+  const uiScore = document.getElementById('scoreText');
+  const uiHint = document.getElementById('hint');
+  const modal = document.getElementById('customModal');
+  const customizeBtn = document.getElementById('customizeBtn');
+  const closeModal = document.getElementById('closeModal');
+  const resetAssetsBtn = document.getElementById('resetAssets');
+
+  // --- ASSET HANDLING ---
+
+  // Open/Close Modal
+  customizeBtn.addEventListener('click', () => {
+    modal.classList.add('active');
+  });
+  closeModal.addEventListener('click', () => {
+    modal.classList.remove('active');
+  });
+  modal.addEventListener('click', (e) => {
+    if(e.target === modal) modal.classList.remove('active');
+  });
+
+  // Handle File Uploads
+  document.querySelectorAll('.file-input').forEach(input => {
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const type = input.dataset.type;
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          assets[type] = img;
+          // Update label text
+          document.getElementById(`lbl-${type}`).classList.add('has-file');
+          document.getElementById(`lbl-${type}`).innerHTML = `✓ ${file.name} <input type="file" class="file-input" accept="image/*" data-type="${type}">`;
+          
+          // Re-attach event listener to the new input
+          document.getElementById(`lbl-${type}`).querySelector('input').addEventListener('change', arguments.callee);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // Reset Assets
+  resetAssetsBtn.addEventListener('click', () => {
+    assets.bird = null;
+    assets.pipe = null;
+    assets.bg = null;
+    assets.ground = null;
+    groundPattern = null;
+
+    // Reset UI labels
+    ['bird', 'pipe', 'bg', 'ground'].forEach(type => {
+      const lbl = document.getElementById(`lbl-${type}`);
+      lbl.classList.remove('has-file');
+      lbl.innerHTML = `Click to upload ${type.charAt(0).toUpperCase() + type.slice(1)} <input type="file" class="file-input" accept="image/*" data-type="${type}">`;
+      lbl.querySelector('input').addEventListener('change', lbl.querySelector('input').onchange); // This needs a better reference, but page reload is often safer for full reset. 
+      // Re-attaching properly:
+      lbl.querySelector('input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const t = this.dataset.type;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const im = new Image();
+          im.onload = () => { assets[t] = im; };
+          im.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+  });
+
+
+  // --- FUNCTIONS ---
+
+  function reset() {
+    bird.y = H/2;
+    bird.vy = 0;
+    bird.rotation = 0;
+    bird.floatOffset = 0;
+    pipes = [];
+    particles = [];
+    lastPipeTime = performance.now();
+    score = 0;
+    state = 'ready';
+    shake = 0;
+    
+    // Init clouds
+    clouds = [];
+    for(let i=0; i<5; i++) {
+      clouds.push(createCloud(Math.random() * W));
+    }
+    
+    uiScore.textContent = '0';
+    uiScore.style.opacity = '0'; 
+    uiHint.textContent = 'Tap / Click / Space to Start';
+  }
+
+  function createCloud(startX) {
+    return {
+      x: startX || W + 100,
+      y: Math.random() * (H/2),
+      w: 60 + Math.random() * 40,
+      speed: 20 + Math.random() * 20 
+    };
+  }
+
+  function createParticles(x, y) {
+    // If we have a bird image, use its color or generic yellow. If not, yellow.
+    const baseColor = assets.bird ? '#ffdd57' : '#ffdd57';
+    
+    for(let i=0; i<15; i++) {
+      particles.push({
+        x: x, y: y,
+        vx: (Math.random() - 0.5) * 10,
+        vy: (Math.random() - 0.5) * 10,
+        life: 1.0,
+        color: i % 2 === 0 ? baseColor : '#fff'
+      });
+    }
+  }
+
+  function spawnPipe() {
+    const minY = 120;
+    const maxY = H - GROUND_HEIGHT - 120;
+    const gapY = Math.random() * (maxY - minY) + minY;
+    pipes.push({ x: W + 20, gapY, passed: false });
+  }
+
+  function flap() {
+    if (state === 'ready') {
+      state = 'playing';
+      lastPipeTime = performance.now();
+      spawnPipe();
+      uiScore.style.opacity = '1';
+      uiHint.textContent = ''; 
+    }
+    if (state === 'playing') {
+      bird.vy = FLAP_STRENGTH;
+    } else if (state === 'over') {
+      reset();
+    }
+  }
+
+  function gameOver() {
+    state = 'over';
+    shake = 15; 
+    createParticles(bird.x, bird.y);
+    uiHint.textContent = 'Tap to Restart';
+    if (score > best) {
+      best = score;
+      localStorage.setItem('flappy_best', best);
+    }
+  }
+
+  function update(dt, now) {
+    // Update Ground Scroll
+    if (state !== 'over') groundOffset = (groundOffset + SCROLL_SPEED * dt) % 40;
+
+    // Update Clouds (Parallax)
+    for (let i = clouds.length - 1; i >= 0; i--) {
+      clouds[i].x -= clouds[i].speed * dt;
+      if (clouds[i].x + clouds[i].w < -50) {
+        clouds.splice(i, 1);
+        clouds.push(createCloud());
+      }
+    }
+
+    // Update Particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      let p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.5; 
+      p.life -= dt * 2;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // Screen Shake Decay
+    if (shake > 0) shake *= 0.9;
+    if (shake < 0.5) shake = 0;
+
+    if (state === 'playing') {
+      bird.vy += GRAVITY;
+      bird.y += bird.vy;
+      bird.rotation = Math.max(-0.5, Math.min(1.2, bird.vy / 10));
+
+      if (now - lastPipeTime > PIPE_INTERVAL) {
+        spawnPipe();
+        lastPipeTime = now;
+      }
+
+      for (let i = pipes.length - 1; i >= 0; i--) {
+        const p = pipes[i];
+        p.x -= SCROLL_SPEED * dt;
+
+        if (!p.passed && p.x + PIPE_WIDTH < bird.x - bird.r) {
+          p.passed = true;
+          score++;
+          uiScore.textContent = score;
+        }
+
+        if (p.x + PIPE_WIDTH < -50) pipes.splice(i, 1);
+
+        const topRect = { x: p.x, y: 0, w: PIPE_WIDTH, h: p.gapY - PIPE_GAP/2 };
+        const botRect = { x: p.x, y: p.gapY + PIPE_GAP/2, w: PIPE_WIDTH, h: H - GROUND_HEIGHT - (p.gapY + PIPE_GAP/2) };
+        if (circleRectCollide(bird.x, bird.y, bird.r, topRect) || 
+            circleRectCollide(bird.x, bird.y, bird.r, botRect)) {
+          gameOver();
+        }
+      }
+
+      if (bird.y + bird.r >= H - GROUND_HEIGHT || bird.y - bird.r <= 0) {
+        gameOver();
+      }
+
+    } else if (state === 'ready') {
+      bird.floatOffset = Math.sin(now / 300) * 5;
+      bird.y = (H/2) + bird.floatOffset;
+      bird.rotation = 0;
+    }
+  }
+
+  // --- DRAWING ---
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.save();
+    
+    // Apply Screen Shake
+    if (shake > 0) {
+      const dx = (Math.random() - 0.5) * shake;
+      const dy = (Math.random() - 0.5) * shake;
+      ctx.translate(dx, dy);
+    }
+
+    // 1. Draw Background
+    if (assets.bg) {
+      // Draw image with "cover" logic
+      const img = assets.bg;
+      const rCanvas = W / H;
+      const rImg = img.width / img.height;
+      
+      let dw, dh, dx, dy;
+      
+      if (rImg > rCanvas) {
+        dh = H;
+        dw = H * rImg;
+        dy = 0;
+        dx = (W - dw) / 2;
+      } else {
+        dw = W;
+        dh = W / rImg;
+        dx = 0;
+        dy = (H - dh) / 2;
+      }
+      ctx.drawImage(img, dx, dy, dw, dh);
+    } else {
+      // Default Gradient
+      const grad = ctx.createLinearGradient(0,0,0,H);
+      grad.addColorStop(0, '#9be3e8');
+      grad.addColorStop(1, '#70c5ce');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,W,H);
+    }
+
+    // Draw Clouds (only if no custom BG, or keep them for parallax?) Let's keep them for flavor.
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    for (const c of clouds) {
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, c.w/2, c.w/4, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // 2. Draw Pipes
+    for (const p of pipes) {
+      if (assets.pipe) {
+        // Draw Pipe Image
+        const img = assets.pipe;
+        // Top Pipe
+        ctx.save();
+        ctx.translate(p.x + PIPE_WIDTH/2, p.gapY - PIPE_GAP/2);
+        ctx.scale(1, -1); // Flip vertically
+        ctx.drawImage(img, -PIPE_WIDTH/2, -20, PIPE_WIDTH, 20); // Cap area (simplified)
+        ctx.drawImage(img, -PIPE_WIDTH/2, - (p.gapY - PIPE_GAP/2 + 20), PIPE_WIDTH, p.gapY - PIPE_GAP/2); // Body
+        ctx.restore();
+
+        // Bottom Pipe
+        ctx.save();
+        ctx.translate(p.x + PIPE_WIDTH/2, p.gapY + PIPE_GAP/2);
+        ctx.drawImage(img, -PIPE_WIDTH/2, 0, PIPE_WIDTH, 20); // Cap
+        ctx.drawImage(img, -PIPE_WIDTH/2, 20, PIPE_WIDTH, H - GROUND_HEIGHT - (p.gapY + PIPE_GAP/2)); // Body
+        ctx.restore();
+      } else {
+        // Default Procedural Pipes
+        ctx.fillStyle = '#2ea84a';
+        ctx.fillRect(p.x, 0, PIPE_WIDTH, p.gapY - PIPE_GAP/2);
+        ctx.fillRect(p.x, p.gapY + PIPE_GAP/2, PIPE_WIDTH, H - GROUND_HEIGHT - (p.gapY + PIPE_GAP/2));
+        
+        ctx.fillStyle = '#1f7a34';
+        ctx.fillRect(p.x-4, p.gapY - PIPE_GAP/2 - 12, PIPE_WIDTH+8, 12);
+        ctx.fillRect(p.x-4, p.gapY + PIPE_GAP/2, PIPE_WIDTH+8, 12);
+      }
+    }
+
+    // 3. Draw Ground
+    if (assets.ground) {
+      // Create pattern if not exists
+      if (!groundPattern) {
+        groundPattern = ctx.createPattern(assets.ground, 'repeat-x');
+      }
+      ctx.save();
+      ctx.translate(0, H - GROUND_HEIGHT);
+      // Apply scrolling to pattern transform
+      const matrix = new DOMMatrix();
+      matrix.translateSelf(-groundOffset, 0);
+      groundPattern.setTransform(matrix);
+      
+      ctx.fillStyle = groundPattern;
+      ctx.fillRect(0, 0, W, GROUND_HEIGHT);
+      
+      // Top border line (green grass) still looks good usually, but let's skip if custom ground implies it
+      // Or just draw a thin green line to separate
+      ctx.fillStyle = '#73bf2e'; 
+      ctx.fillRect(0, 0, W, 4); 
+      ctx.restore();
+    } else {
+      // Default Ground
+      ctx.fillStyle = '#ded895';
+      ctx.fillRect(0, H - GROUND_HEIGHT, W, GROUND_HEIGHT);
+      ctx.fillStyle = '#73bf2e';
+      ctx.fillRect(0, H - GROUND_HEIGHT, W, 12);
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 3;
+      for(let i = -40; i < W + 40; i+=40) {
+        let x = i - groundOffset;
+        ctx.moveTo(x, H - GROUND_HEIGHT + 15);
+        ctx.lineTo(x - 20, H);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Draw Bird
+    if (state !== 'over' || particles.length > 0) { 
+        if (state !== 'over') {
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            ctx.rotate(bird.rotation);
+            
+            if (assets.bird) {
+              // Draw Custom Bird Image (32x32 area centered)
+              const size = bird.r * 2;
+              ctx.drawImage(assets.bird, -bird.r, -bird.r, size, size);
+            } else {
+              // Default Bird
+              ctx.fillStyle = '#f4e04d';
+              ctx.beginPath();
+              ctx.arc(0, 0, bird.r, 0, Math.PI*2);
+              ctx.fill();
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = '#543847';
+              ctx.stroke();
+              ctx.fillStyle = '#fff';
+              ctx.beginPath();
+              ctx.arc(6, -6, 6, 0, Math.PI*2);
+              ctx.fill();
+              ctx.fillStyle = '#000'; 
+              ctx.beginPath();
+              ctx.arc(8, -6, 2, 0, Math.PI*2);
+              ctx.fill();
+              ctx.fillStyle = '#e86101';
+              ctx.beginPath();
+              ctx.ellipse(6, 4, 8, 5, 0, 0, Math.PI*2);
+              ctx.fill();
+              ctx.fillStyle = '#fff';
+              ctx.beginPath();
+              ctx.ellipse(-4, 2, 8, 5, 0.2, 0, Math.PI*2);
+              ctx.fill();
+            }
+            ctx.restore();
+        }
+    }
+
+    // 5. Draw Particles
+    for (const p of particles) {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    }
+
+    ctx.restore(); 
+
+    // 6. Game Over Overlay
+    if (state === 'over') {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(0, 0, W, H);
+      
+      ctx.fillStyle = '#ded895';
+      ctx.strokeStyle = '#543847';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(W/2 - 90, H/2 - 100, 180, 180, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#e86101';
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.fillText('Game Over', W/2, H/2 - 50);
+
+      ctx.fillStyle = '#543847';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('Score', W/2, H/2 - 10);
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText(score, W/2, H/2 + 25);
+      
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = '#e86101';
+      ctx.fillText('Best: ' + best, W/2, H/2 + 60);
+    }
+  }
+
+  // --- HELPERS ---
+  function circleRectCollide(cx, cy, r, rect) {
+    const closestX = clamp(cx, rect.x, rect.x + rect.w);
+    const closestY = clamp(cy, rect.y, rect.y + rect.h);
+    const dx = cx - closestX, dy = cy - closestY;
+    return (dx*dx + dy*dy) <= (r*r);
+  }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  // --- LOOP ---
+  let lastTime = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.033, (now - lastTime) / 1000);
+    update(dt, now);
+    draw();
+    lastTime = now;
+    requestAnimationFrame(loop);
+  }
+
+  // --- INPUTS ---
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); flap(); }
+  });
+  canvas.addEventListener('mousedown', e => { flap(); });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); flap(); }, {passive:false});
+
+  reset();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
